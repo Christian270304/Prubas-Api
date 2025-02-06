@@ -1,7 +1,12 @@
 const express = require('express');
 const path = require('path');
-const app = express();
+const http = require('http');
+const socketIo = require('socket.io');
 const authRoutes = require('./routes/auth');
+
+const app = express();
+const server = http.createServer(app);
+const io = socketIo(server);
 
 // Middleware para parsear JSON
 app.use(express.json());
@@ -22,8 +27,6 @@ app.get('/protected', (req, res) => {
 
 // Manejo de conexiones de WebSocket
 const players = {};
-const server = require('http').createServer(app);
-const io = require('socket.io')(server);
 
 io.on('connection', (socket) => {
     console.log('Nuevo jugador conectado:', socket.id);
