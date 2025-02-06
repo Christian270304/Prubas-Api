@@ -57,3 +57,8 @@ io.on('connection', (socket) => {
         delete players[socket.id];
     });
 });
+
+// Iniciar el servidor
+server.listen(PORT, () => {
+    console.log(`Servidor escuchando en el puerto ${PORT}`);
+});
