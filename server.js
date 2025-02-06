@@ -15,14 +15,24 @@ const server = createServer(app);
 const io = new Server(server);
 
 // Conectar a la base de datos MySQL
-const db = await mysql.createConnection({
-    host: process.env.HOST,
-    user: process.env.USER,
-    password: process.env.PASSWORD,
-    database: process.env.DATABASE
-});
+async function connectToDatabase() {
+    try {
+        db = await mysql.createConnection({
+            host: process.env.HOST,
+            user: process.env.USER,
+            password: process.env.PASSWORD,
+            database: process.env.DATABASE
+        });
 
-console.log('Conectado a la base de datos');
+        console.log('Conectado a la base de datos');
+    } catch (error) {
+        console.error('Error al conectar a la base de datos:', error);
+        process.exit(1); // Salir del proceso si no se puede conectar a la base de datos
+    }
+    console.log('Conectado a la base de datos');
+}
+
+await connectToDatabase();
 
 // Middleware para parsear JSON
 app.use(express.json());
