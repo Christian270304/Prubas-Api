@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('path');
 const http = require('http');
 const socketIo = require('socket.io');
+const cors = require('cors'); // Importar cors
 const authRoutes = require('./routes/auth');
 
 // Usar el puerto proporcionado por Render o el puerto 3000 en desarrollo
@@ -13,6 +14,13 @@ const io = socketIo(server);
 
 // Middleware para parsear JSON
 app.use(express.json());
+
+// Configurar CORS para permitir solicitudes desde el dominio del frontend
+app.use(cors({
+    origin: 'http://stars-hunters.ctorres.cat', // Reemplaza con el dominio de tu frontend
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type']
+}));
 
 // Usar las rutas de autenticación
 app.use('/auth', authRoutes);
