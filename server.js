@@ -17,7 +17,7 @@ const io = new Server(server);
 // Conectar a la base de datos MySQL
 async function connectToDatabase() {
     try {
-        db = await mysql.createConnection({
+        const db = await mysql.createConnection({
             host: process.env.HOST,
             user: process.env.USER,
             password: process.env.PASSWORD,
