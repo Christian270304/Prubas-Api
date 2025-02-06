@@ -19,7 +19,7 @@ export default (pool) => {
 
                 res.status(200).json({ message: 'Server created', namespace });
             } else {
-                res.status(500).json({ message: 'Error al crear el servidor' });
+                res.status(500).json({ message: 'Error al crear el servidor: No rows affected' });
             }
         } catch (error) {
             res.status(500).json({ message: 'Error al crear el servidor', error });
