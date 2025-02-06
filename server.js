@@ -50,6 +50,9 @@ app.use(cors({
 
 app.options('*', cors());
 
+// Servir el archivo socket.io.js desde node_modules
+app.use('/socket.io', express.static(path.join(__dirname, 'node_modules', 'socket.io', 'client-dist')));
+
 // Usar las rutas de autenticación
 app.use('/auth', authRoutes(pool));
 app.use('/servers', serverRoutes(pool));
