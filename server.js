@@ -102,6 +102,10 @@ export const createNamespace = (namespace) => {
     namespaces[namespace] = nsp;
 };
 
+// Aumentar los valores de keepAliveTimeout y headersTimeout
+server.keepAliveTimeout = 120 * 1000; // 120 segundos
+server.headersTimeout = 120 * 1000; // 120 segundos
+
 // Iniciar el servidor
 server.listen(PORT, () => {
     console.log(`Servidor escuchando en el puerto ${PORT}`);
