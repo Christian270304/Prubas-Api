@@ -1,29 +1,42 @@
-const express = require('express');
-const path = require('path');
-const http = require('http');
-const socketIo = require('socket.io');
-const cors = require('cors'); // Importar cors
-const authRoutes = require('./routes/auth');
+import express from 'express';
+import path from 'path';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
+import cors from 'cors';
+import mysql from 'mysql2/promise';
+import authRoutes from './routes/auth.js';
+import serverRoutes from './routes/servers.js';
 
 // Usar el puerto proporcionado por Render o el puerto 3000 en desarrollo
 const PORT = process.env.PORT || 3000;
 
 const app = express();
-const server = http.createServer(app);
-const io = socketIo(server);
+const server = createServer(app);
+const io = new Server(server);
+
+// Conectar a la base de datos MySQL
+const db = await mysql.createConnection({
+    host: process.env.HOST,
+    user: process.env.USER,
+    password: process.env.PASSWORD,
+    database: process.env.DATABASE
+});
+
+console.log('Conectado a la base de datos');
 
 // Middleware para parsear JSON
 app.use(express.json());
 
 // Configurar CORS para permitir solicitudes desde el dominio del frontend
 app.use(cors({
-    origin: 'http://stars-hunters.ctorres.cat', // Reemplaza con el dominio de tu frontend
+    origin: 'http://stars-hunters.ctorres.cat', 
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type']
 }));
 
 // Usar las rutas de autenticación
-app.use('/auth', authRoutes);
+app.use('/auth', authRoutes(db));
+app.use('/servers', serverRoutes(db));
 
 // Ruta protegida (ejemplo)
 app.get('/protected', (req, res) => {
@@ -36,35 +49,42 @@ app.get('/protected', (req, res) => {
     }
 });
 
-// Manejo de conexiones de WebSocket
-const players = {};
+// Crear múltiples namespaces para diferentes instancias de juego
+const namespaces = {};
 
-io.on('connection', (socket) => {
-    console.log('Nuevo jugador conectado:', socket.id);
+const createNamespace = (namespace) => {
+    const nsp = io.of(namespace);
+    const players = {};
 
-    players[socket.id] = { x: Math.random() * 800, y: Math.random() * 600, id: socket.id };
+    nsp.on('connection', (socket) => {
+        console.log(`Nuevo jugador conectado en ${namespace}:`, socket.id);
 
-    socket.emit('currentPlayers', players);
-    socket.broadcast.emit('newPlayer', players[socket.id]);
+        players[socket.id] = { x: Math.random() * 800, y: Math.random() * 600, id: socket.id };
 
-    socket.on('move', (data) => {
-        if (players[socket.id]) {
-            players[socket.id].x = data.x;
-            players[socket.id].y = data.y;
-            socket.broadcast.emit('playerMoved', players[socket.id]);
-        }
+        socket.emit('currentPlayers', players);
+        socket.broadcast.emit('newPlayer', players[socket.id]);
+
+        socket.on('move', (data) => {
+            if (players[socket.id]) {
+                players[socket.id].x = data.x;
+                players[socket.id].y = data.y;
+                socket.broadcast.emit('playerMoved', players[socket.id]);
+            }
+        });
+
+        socket.on('estrella', (data) => {
+            console.log(`Mensaje recibido: ${data}`);
+            socket.emit('respuesta', 'Mensaje recibido en el servidor');
+        });
+
+        socket.on('disconnect', () => {
+            console.log(`Jugador desconectado en ${namespace}:`, socket.id);
+            delete players[socket.id];
+        });
     });
 
-    socket.on('estrella', (data) => {
-        console.log(`Mensaje recibido: ${data}`);
-        socket.emit('respuesta', 'Mensaje recibido en el servidor');
-    });
-
-    socket.on('disconnect', () => {
-        console.log('Jugador desconectado:', socket.id);
-        delete players[socket.id];
-    });
-});
+    namespaces[namespace] = nsp;
+};
 
 // Iniciar el servidor
 server.listen(PORT, () => {
