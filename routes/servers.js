@@ -10,6 +10,8 @@ export default (pool) => {
 
         try {
             const connection = await pool.getConnection();
+            res.status(200).json({ connection });
+            exit();
             const [results] = await connection.execute('INSERT INTO servers (name, namespace) VALUES (?, ?)', [name, namespace]);
             connection.release();
 
