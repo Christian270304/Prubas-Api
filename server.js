@@ -3,7 +3,9 @@ const path = require('path');
 const http = require('http');
 const socketIo = require('socket.io');
 const authRoutes = require('./routes/auth');
-const PORT = 3000;
+
+// Usar el puerto proporcionado por Render o el puerto 3000 en desarrollo
+const PORT = process.env.PORT || 3000;
 
 const app = express();
 const server = http.createServer(app);
