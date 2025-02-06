@@ -29,10 +29,9 @@ async function connectToDatabase() {
         console.error('Error al conectar a la base de datos:', error);
         process.exit(1); // Salir del proceso si no se puede conectar a la base de datos
     }
-    console.log('Conectado a la base de datos');
 }
 
-await connectToDatabase();
+db = await connectToDatabase();
 
 // Middleware para parsear JSON
 app.use(express.json());
