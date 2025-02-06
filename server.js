@@ -3,6 +3,7 @@ const path = require('path');
 const http = require('http');
 const socketIo = require('socket.io');
 const authRoutes = require('./routes/auth');
+const PORT = 3000;
 
 const app = express();
 const server = http.createServer(app);
