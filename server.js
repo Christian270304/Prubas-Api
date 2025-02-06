@@ -13,7 +13,14 @@ const PORT = process.env.PORT || 3000;
 
 const app = express();
 const server = createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+    cors: {
+        origin: 'http://stars-hunters.ctorres.cat',
+        methods: ['GET', 'POST'],
+        allowedHeaders: ['Content-Type'],
+        credentials: true
+    }
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -49,7 +56,7 @@ app.use(express.json());
 app.use(cors({
     origin: 'http://stars-hunters.ctorres.cat', 
     methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type']
+    allowedHeaders: ['Content-Type'],
 }));
 
 app.options('*', cors());
