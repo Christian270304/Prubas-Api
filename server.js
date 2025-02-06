@@ -92,13 +92,17 @@ export const createNamespace = (namespace) => {
 
         players[socket.id] = { x: Math.random() * 800, y: Math.random() * 600, id: socket.id };
 
+        // Enviar la lista actual de jugadores al nuevo jugador
         socket.emit('currentPlayers', players);
+
+        // Notificar a todos los demás jugadores sobre el nuevo jugador
         socket.broadcast.emit('newPlayer', players[socket.id]);
 
         socket.on('move', (data) => {
             if (players[socket.id]) {
                 players[socket.id].x = data.x;
                 players[socket.id].y = data.y;
+                // Notificar a todos los demás jugadores sobre el movimiento del jugador
                 socket.broadcast.emit('playerMoved', players[socket.id]);
             }
         });
@@ -110,6 +114,8 @@ export const createNamespace = (namespace) => {
 
         socket.on('disconnect', () => {
             console.log(`Jugador desconectado en ${namespace}:`, socket.id);
+            // Notificar a todos los demás jugadores sobre la desconexión del jugador
+            socket.broadcast.emit('playerDisconnected', socket.id);
             delete players[socket.id];
         });
     });
