@@ -14,14 +14,19 @@ const app = express();
 const server = createServer(app);
 const io = new Server(server);
 
+let pool;
+
 // Conectar a la base de datos MySQL
 async function connectToDatabase() {
     try {
-        const db = await mysql.createConnection({
+        pool = mysql.createPool({
             host: process.env.HOST,
             user: process.env.USER,
             password: process.env.PASSWORD,
-            database: process.env.DATABASE
+            database: process.env.DATABASE,
+            waitForConnections: true,
+            connectionLimit: 10, // Ajusta este valor según tus necesidades
+            queueLimit: 0
         });
 
         console.log('Conectado a la base de datos');
@@ -31,7 +36,7 @@ async function connectToDatabase() {
     }
 }
 
-const db = await connectToDatabase();
+await connectToDatabase();
 
 // Middleware para parsear JSON
 app.use(express.json());
@@ -44,8 +49,8 @@ app.use(cors({
 }));
 
 // Usar las rutas de autenticación
-app.use('/auth', authRoutes(db));
-app.use('/servers', serverRoutes(db));
+app.use('/auth', authRoutes(pool));
+app.use('/servers', serverRoutes(pool));
 
 // Ruta protegida (ejemplo)
 app.get('/protected', (req, res) => {

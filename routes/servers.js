@@ -2,14 +2,16 @@ import { Router } from 'express';
 
 const router = Router();
 
-export default (db) => {
+export default (pool) => {
     // Ruta para crear un servidor
     router.post('/create', async (req, res) => {
         const { name } = req.body;
         const namespace = `/game-${Date.now()}`;
 
         try {
-            const [results] = await db.execute('INSERT INTO servers (name, namespace) VALUES (?, ?)', [name, namespace]);
+            const connection = await pool.getConnection();
+            const [results] = await connection.execute('INSERT INTO servers (name, namespace) VALUES (?, ?)', [name, namespace]);
+            connection.release();
 
             if (results.affectedRows > 0) {
                 // Crear el namespace en Socket.IO
@@ -27,7 +29,9 @@ export default (db) => {
     // Ruta para listar los servidores disponibles
     router.get('/list', async (req, res) => {
         try {
-            const [results] = await db.execute('SELECT * FROM servers');
+            const connection = await pool.getConnection();
+            const [results] = await connection.execute('SELECT * FROM servers');
+            connection.release();
 
             res.status(200).json(results);
         } catch (error) {

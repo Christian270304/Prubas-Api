@@ -2,15 +2,17 @@ import { Router } from 'express';
 
 const router = Router();
 
-export default (db) => {
+export default (pool) => {
     // Ruta de autenticación 
     router.post('/login', async (req, res) => {
         const { username, password } = req.body;
 
         try {
-            const [results] = await db.execute('SELECT password FROM users WHERE username = ?', [username]);
+            const connection = await pool.getConnection();
+            const [results] = await connection.execute('SELECT password FROM users WHERE username = ?', [username]);
+            connection.release();
 
-            if (results[0].password === password) {
+            if (results.length > 0 && results[0].password === password) {
                 // Si las credenciales son correctas, enviar una respuesta exitosa
                 res.status(200).json({ message: 'Login successful' });
             } else {
@@ -27,7 +29,9 @@ export default (db) => {
         const { username, password } = req.body;
 
         try {
-            const [results] = await db.execute('INSERT INTO users (username, password) VALUES (?, ?)', [username, password]);
+            const connection = await pool.getConnection();
+            const [results] = await connection.execute('INSERT INTO users (username, password) VALUES (?, ?)', [username, password]);
+            connection.release();
 
             // Si la inserción fue exitosa, enviar una respuesta exitosa
             res.status(200).json({ message: 'SignUp successful' });
