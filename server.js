@@ -57,6 +57,7 @@ app.use(cors({
     origin: 'http://stars-hunters.ctorres.cat', 
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type'],
+    credentials: true
 }));
 
 app.options('*', cors());
