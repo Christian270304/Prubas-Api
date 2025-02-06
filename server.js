@@ -48,6 +48,8 @@ app.use(cors({
     allowedHeaders: ['Content-Type']
 }));
 
+app.options('*', cors());
+
 // Usar las rutas de autenticación
 app.use('/auth', authRoutes(pool));
 app.use('/servers', serverRoutes(pool));
