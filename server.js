@@ -54,7 +54,7 @@ app.use(express.json());
 
 // Configurar CORS para permitir solicitudes desde el dominio del frontend
 app.use(cors({
-    origin: 'http://stars-hunters.ctorres.cat', 
+    origin: 'http://stars-hunters.ctorres.cat',
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type'],
     credentials: true
