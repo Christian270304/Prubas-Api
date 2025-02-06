@@ -8,9 +8,9 @@ export default (db) => {
         const { username, password } = req.body;
 
         try {
-            const [results] = await db.execute('SELECT * FROM users WHERE username = ? AND password = ?', [username, password]);
+            const [results] = await db.execute('SELECT password FROM users WHERE username = ?', [username]);
 
-            if (results.length > 0) {
+            if (results[0].password === password) {
                 // Si las credenciales son correctas, enviar una respuesta exitosa
                 res.status(200).json({ message: 'Login successful' });
             } else {
