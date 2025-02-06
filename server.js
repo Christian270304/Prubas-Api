@@ -31,7 +31,7 @@ async function connectToDatabase() {
     }
 }
 
-db = await connectToDatabase();
+const db = await connectToDatabase();
 
 // Middleware para parsear JSON
 app.use(express.json());
