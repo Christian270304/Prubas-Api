@@ -68,7 +68,7 @@ app.get('/protected', (req, res) => {
 // Crear múltiples namespaces para diferentes instancias de juego
 const namespaces = {};
 
-const createNamespace = (namespace) => {
+export const createNamespace = (namespace) => {
     const nsp = io.of(namespace);
     const players = {};
 
