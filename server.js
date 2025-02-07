@@ -71,7 +71,6 @@ app.use('/servers', serverRoutes(pool));
 
 // Ruta protegida (ejemplo)
 app.get('/protected', (req, res) => {
-    // Aquí deberías verificar si el usuario está autenticado
     const isAuthenticated = false; // Cambia esto por tu lógica de autenticación
     if (isAuthenticated) {
         res.status(200).send('Contenido protegido');
@@ -93,7 +92,7 @@ export const createNamespace = (namespace) => {
     };
 
     nsp.on('connection', (socket) => {
-        console.log(`Nuevo jugador conectado en ${namespace}:`, socket.id);
+        console.log(`Nuevo jugador conectado en ${namespace}: ${socket.id}`);
 
         // Asignar posición inicial aleatoria al nuevo jugador
         gameState.players[socket.id] = {
@@ -105,8 +104,8 @@ export const createNamespace = (namespace) => {
         // Enviar el estado global actual al nuevo jugador
         socket.emit('gameState', gameState);
 
-        // Notificar a todos los demás jugadores sobre el nuevo jugador
-        socket.broadcast.emit('newPlayer', gameState.players[socket.id]);
+        // Notificar a todos los jugadores sobre el nuevo jugador
+        nsp.emit('newPlayer', gameState.players[socket.id]);
 
         socket.on('move', (data) => {
             if (gameState.players[socket.id]) {
@@ -124,10 +123,10 @@ export const createNamespace = (namespace) => {
         });
 
         socket.on('disconnect', () => {
-            console.log(`Jugador desconectado en ${namespace}:`, socket.id);
+            console.log(`Jugador desconectado en ${namespace}: ${socket.id}`);
 
             // Notificar a los demás jugadores y eliminar al jugador
-            socket.broadcast.emit('playerDisconnected', socket.id);
+            nsp.emit('playerDisconnected', socket.id);
             delete gameState.players[socket.id];
 
             // Enviar estado actualizado
@@ -135,21 +134,21 @@ export const createNamespace = (namespace) => {
         });
     });
 
+    // Enviar actualizaciones constantes a los clientes
+    setInterval(() => {
+        nsp.emit('gameState', gameState);
+    }, 100);
+
     namespaces[namespace] = nsp;
 };
 
 // Función para generar estrellas en posiciones aleatorias
 function generarEstrellas() {
-    const estrellas = [];
-    for (let i = 0; i < 10; i++) {
-        estrellas.push({
-            x: Math.random() * 800,
-            y: Math.random() * 600
-        });
-    }
-    return estrellas;
+    return Array.from({ length: 10 }, () => ({
+        x: Math.random() * 800,
+        y: Math.random() * 600
+    }));
 }
-
 
 // Aumentar los valores de keepAliveTimeout y headersTimeout
 server.keepAliveTimeout = 120 * 1000; // 120 segundos
@@ -157,5 +156,5 @@ server.headersTimeout = 120 * 1000; // 120 segundos
 
 // Iniciar el servidor
 server.listen(PORT, () => {
-    console.log(`Servidor escuchando en el puerto ${PORT}`);
+    console.log(`🚀 Servidor escuchando en el puerto ${PORT}`);
 });
