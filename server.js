@@ -7,6 +7,8 @@ import cors from 'cors';
 import mysql from 'mysql2/promise';
 import authRoutes from './routes/auth.js';
 import serverRoutes from './routes/servers.js';
+import { Worker } from 'worker_threads';
+
 
 // Usar el puerto proporcionado por Render o el puerto 3000 en desarrollo
 const PORT = process.env.PORT || 3000;
@@ -71,20 +73,22 @@ app.use('/servers', serverRoutes(pool));
 
 // Crear múltiples namespaces para diferentes instancias de juego
 const namespaces = {};
+const gameStates = {}; // Guardará el estado de cada namespace
 
 export const createNamespace = (namespace) => {
     const nsp = io.of(namespace);
+    
     const gameState = {
         estrellas: generarEstrellas(),
         players: {}
     };
 
+    gameStates[namespace] = gameState; // Guardar el estado globalmente
+
     nsp.on('connection', (socket) => {
         console.log(`Nuevo jugador conectado en ${namespace}: ${socket.id}`);
 
-        // Si el jugador ya existe en el estado, mantenemos su posición
         if (!gameState.players[socket.id]) {
-            // Asignar posición inicial aleatoria al nuevo jugador
             gameState.players[socket.id] = {
                 x: Math.random() * 800,
                 y: Math.random() * 600,
@@ -92,27 +96,23 @@ export const createNamespace = (namespace) => {
             };
         }
 
-        // Emitir estado inicial al jugador
         socket.emit('gameState', gameState);
-
-        // Notificar a otros jugadores sobre el nuevo jugador
         socket.broadcast.emit('newPlayer', gameState.players[socket.id]);
 
-        // Manejo de movimiento
         socket.on('move', (data) => {
             if (gameState.players[socket.id]) {
                 gameState.players[socket.id].x = data.x;
                 gameState.players[socket.id].y = data.y;
-                // Emitir solo a jugadores cercanos
+
                 Object.values(gameState.players).forEach(p => {
-                    if (Math.abs(gameState.players[socket.id].x - p.x) < 500 && Math.abs(gameState.players[socket.id].y - p.y) < 500) {
+                    if (Math.abs(gameState.players[socket.id].x - p.x) < 500 &&
+                        Math.abs(gameState.players[socket.id].y - p.y) < 500) {
                         socket.to(p.id).emit('playerMoved', gameState.players[socket.id]);
                     }
                 });
             }
         });
 
-        // Manejo de desconexión
         socket.on('disconnect', () => {
             console.log(`Jugador desconectado en ${namespace}: ${socket.id}`);
             socket.broadcast.emit('playerDisconnected', socket.id);
@@ -121,23 +121,6 @@ export const createNamespace = (namespace) => {
     });
 
     namespaces[namespace] = nsp;
-
-    setInterval(() => {
-        nsp.emit('gameState', gameState); // Emitir el estado completo a todos los jugadores
-    }, 1000 / 15); // 15Hz - Reducción de frecuencia de actualización
-
-    // **Emisión de movimiento solo a jugadores cercanos (20Hz, 50ms)**
-    setInterval(() => {
-        // Emitir solo jugadores que han cambiado
-        Object.values(gameState.players).forEach(player => {
-            // Enviar solo los jugadores cercanos (por ejemplo, a 500px de distancia)
-            Object.values(gameState.players).forEach(otherPlayer => {
-                if (Math.abs(player.x - otherPlayer.x) < 500 && Math.abs(player.y - otherPlayer.y) < 500) {
-                    nsp.to(otherPlayer.id).emit('playerMoved', player); // Emite solo a los jugadores cercanos
-                }
-            });
-        });
-    }, 1000 / 10); // 20Hz (50ms) - menos frecuente que la actualización del estado completo
 };
 
 // Función para generar estrellas en posiciones aleatorias
@@ -168,14 +151,14 @@ function updateGameStateWithWorker(gameState) {
 
 // Usar Worker para actualizar el estado del juego en intervalos
 setInterval(() => {
-    updateGameStateWithWorker(gameState)
-        .then(updatedGameState => {
-            // Emitir el estado actualizado a todos los jugadores
-            io.emit('gameState', updatedGameState);
-        })
-        .catch(error => {
-            console.error('Error al procesar el worker:', error);
-        });
+    Object.keys(gameStates).forEach(namespace => {
+        updateGameStateWithWorker(namespace)
+            .then(updatedGameState => {
+                gameStates[namespace] = updatedGameState;
+                io.of(namespace).emit('gameState', updatedGameState);
+            })
+            .catch(error => console.error(`Error en worker (${namespace}):`, error));
+    });
 }, 1000 / 20); // 20Hz (50ms)
 
 // Aumentar los valores de keepAliveTimeout y headersTimeout
