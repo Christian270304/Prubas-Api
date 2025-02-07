@@ -7,8 +7,6 @@ import cors from 'cors';
 import mysql from 'mysql2/promise';
 import authRoutes from './routes/auth.js';
 import serverRoutes from './routes/servers.js';
-import { Worker } from 'worker_threads';
-
 
 // Usar el puerto proporcionado por Render o el puerto 3000 en desarrollo
 const PORT = process.env.PORT || 8080;
@@ -77,7 +75,6 @@ const gameStates = {}; // Guardará el estado de cada namespace
 
 export const createNamespace = (namespace) => {
     const nsp = io.of(namespace);
-    
     const gameState = {
         estrellas: generarEstrellas(),
         players: {}
@@ -88,39 +85,48 @@ export const createNamespace = (namespace) => {
     nsp.on('connection', (socket) => {
         console.log(`Nuevo jugador conectado en ${namespace}: ${socket.id}`);
 
-        if (!gameState.players[socket.id]) {
-            gameState.players[socket.id] = {
-                x: Math.random() * 800,
-                y: Math.random() * 600,
-                id: socket.id
-            };
-        }
+        // Asignar posición inicial aleatoria al nuevo jugador
+        gameState.players[socket.id] = {
+            x: Math.random() * 800,
+            y: Math.random() * 600,
+            id: socket.id
+        };
 
+        // Emitir estado inicial al jugador
         socket.emit('gameState', gameState);
+
+        // Notificar a otros jugadores sobre el nuevo jugador
         socket.broadcast.emit('newPlayer', gameState.players[socket.id]);
 
+        // Manejo de movimiento
         socket.on('move', (data) => {
             if (gameState.players[socket.id]) {
                 gameState.players[socket.id].x = data.x;
                 gameState.players[socket.id].y = data.y;
-
+                // Emitir solo a jugadores cercanos
                 Object.values(gameState.players).forEach(p => {
-                    if (Math.abs(gameState.players[socket.id].x - p.x) < 500 &&
-                        Math.abs(gameState.players[socket.id].y - p.y) < 500) {
+                    if (Math.abs(gameState.players[socket.id].x - p.x) < 500 && Math.abs(gameState.players[socket.id].y - p.y) < 500) {
                         socket.to(p.id).emit('playerMoved', gameState.players[socket.id]);
                     }
                 });
             }
         });
 
+        // Manejo de desconexión
         socket.on('disconnect', () => {
             console.log(`Jugador desconectado en ${namespace}: ${socket.id}`);
             socket.broadcast.emit('playerDisconnected', socket.id);
             delete gameState.players[socket.id];
+            nsp.emit('gameState', gameState);
         });
     });
 
     namespaces[namespace] = nsp;
+
+    // Emisión periódica del estado del juego a todos los jugadores (30Hz, 33ms)
+    setInterval(() => {
+        nsp.emit('gameState', gameState);
+    }, 1000 / 30); // 30Hz, emite cada 33ms
 };
 
 // Función para generar estrellas en posiciones aleatorias
@@ -130,36 +136,6 @@ function generarEstrellas() {
         y: Math.random() * 600
     }));
 }
-
-// Función para actualizar el estado del juego usando un Worker
-function updateGameStateWithWorker(gameState) {
-    return new Promise((resolve, reject) => {
-        const worker = new Worker('./gameWorker.js');
-        
-        worker.on('message', (updatedGameState) => {
-            resolve(updatedGameState);
-        });
-        
-        worker.on('error', (error) => {
-            reject(error);
-        });
-
-        // Enviar el estado del juego al worker
-        worker.postMessage(gameState);
-    });
-}
-
-// Usar Worker para actualizar el estado del juego en intervalos
-setInterval(() => {
-    Object.keys(gameStates).forEach(namespace => {
-        updateGameStateWithWorker(namespace)
-            .then(updatedGameState => {
-                gameStates[namespace] = updatedGameState;
-                io.of(namespace).emit('gameState', updatedGameState);
-            })
-            .catch(error => console.error(`Error en worker (${namespace}):`, error));
-    });
-}, 1000 / 20); // 20Hz (50ms)
 
 // Aumentar los valores de keepAliveTimeout y headersTimeout
 server.keepAliveTimeout = 120 * 1000; // 120 segundos
