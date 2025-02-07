@@ -148,6 +148,36 @@ function generarEstrellas() {
     }));
 }
 
+// Función para actualizar el estado del juego usando un Worker
+function updateGameStateWithWorker(gameState) {
+    return new Promise((resolve, reject) => {
+        const worker = new Worker('./gameWorker.js');
+        
+        worker.on('message', (updatedGameState) => {
+            resolve(updatedGameState);
+        });
+        
+        worker.on('error', (error) => {
+            reject(error);
+        });
+
+        // Enviar el estado del juego al worker
+        worker.postMessage(gameState);
+    });
+}
+
+// Usar Worker para actualizar el estado del juego en intervalos
+setInterval(() => {
+    updateGameStateWithWorker(gameState)
+        .then(updatedGameState => {
+            // Emitir el estado actualizado a todos los jugadores
+            io.emit('gameState', updatedGameState);
+        })
+        .catch(error => {
+            console.error('Error al procesar el worker:', error);
+        });
+}, 1000 / 20); // 20Hz (50ms)
+
 // Aumentar los valores de keepAliveTimeout y headersTimeout
 server.keepAliveTimeout = 120 * 1000; // 120 segundos
 server.headersTimeout = 120 * 1000; // 120 segundos
