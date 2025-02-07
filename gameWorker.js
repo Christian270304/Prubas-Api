@@ -1,5 +1,5 @@
 // gameWorker.js
-const { parentPort } = require('worker_threads');
+import { parentPort } from 'worker_threads';
 
 // Recibir el estado del juego (gameState)
 parentPort.on('message', (gameState) => {
