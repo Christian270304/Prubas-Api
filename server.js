@@ -122,10 +122,9 @@ export const createNamespace = (namespace) => {
 
     namespaces[namespace] = nsp;
 
-    // Emisión periódica del estado del juego a todos los jugadores (30Hz, 33ms)
     setInterval(() => {
-        nsp.emit('gameState', gameState);
-    }, 1000 / 30); // 30Hz, emite cada 33ms
+        nsp.emit('gameState', gameState); // Emitir el estado completo a todos los jugadores
+    }, 1000 / 15); // 15Hz - Reducción de frecuencia de actualización
 
     // **Emisión de movimiento solo a jugadores cercanos (20Hz, 50ms)**
     setInterval(() => {
@@ -138,7 +137,7 @@ export const createNamespace = (namespace) => {
                 }
             });
         });
-    }, 1000 / 20); // 20Hz (50ms) - menos frecuente que la actualización del estado completo
+    }, 1000 / 10); // 20Hz (50ms) - menos frecuente que la actualización del estado completo
 };
 
 // Función para generar estrellas en posiciones aleatorias
