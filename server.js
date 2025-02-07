@@ -11,7 +11,7 @@ import { Worker } from 'worker_threads';
 
 
 // Usar el puerto proporcionado por Render o el puerto 3000 en desarrollo
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 const app = express();
 const server = createServer(app);
