@@ -77,7 +77,7 @@ export const createNamespace = (namespace) => {
     const nsp = io.of(namespace);
     const gameState = {
         estrellas: generarEstrellas(),
-        players: {}
+        players: new Map() // Usamos Map para un acceso más rápido
     };
 
     gameStates[namespace] = gameState; // Guardar el estado globalmente
@@ -86,27 +86,29 @@ export const createNamespace = (namespace) => {
         console.log(`Nuevo jugador conectado en ${namespace}: ${socket.id}`);
 
         // Asignar posición inicial aleatoria al nuevo jugador
-        gameState.players[socket.id] = {
+        gameState.players.set(socket.id, {
             x: Math.random() * 800,
             y: Math.random() * 600,
             id: socket.id
-        };
+        });
 
         // Emitir estado inicial al jugador
         socket.emit('gameState', gameState);
 
         // Notificar a otros jugadores sobre el nuevo jugador
-        socket.broadcast.emit('newPlayer', gameState.players[socket.id]);
+        socket.broadcast.emit('newPlayer', gameState.players.get(socket.id));
 
         // Manejo de movimiento
         socket.on('move', (data) => {
-            if (gameState.players[socket.id]) {
-                gameState.players[socket.id].x = data.x;
-                gameState.players[socket.id].y = data.y;
+            if (gameState.players.has(socket.id)) {
+                const player = gameState.players.get(socket.id);
+                player.x = data.x;
+                player.y = data.y;
+
                 // Emitir solo a jugadores cercanos
-                Object.values(gameState.players).forEach(p => {
-                    if (Math.abs(gameState.players[socket.id].x - p.x) < 500 && Math.abs(gameState.players[socket.id].y - p.y) < 500) {
-                        socket.to(p.id).emit('playerMoved', gameState.players[socket.id]);
+                gameState.players.forEach((p, id) => {
+                    if (Math.abs(player.x - p.x) < 500 && Math.abs(player.y - p.y) < 500) {
+                        socket.to(id).emit('playerMoved', player);
                     }
                 });
             }
@@ -116,7 +118,7 @@ export const createNamespace = (namespace) => {
         socket.on('disconnect', () => {
             console.log(`Jugador desconectado en ${namespace}: ${socket.id}`);
             socket.broadcast.emit('playerDisconnected', socket.id);
-            delete gameState.players[socket.id];
+            gameState.players.delete(socket.id);
             nsp.emit('gameState', gameState);
         });
     });
@@ -125,6 +127,7 @@ export const createNamespace = (namespace) => {
 
     // Emisión periódica del estado del juego a todos los jugadores (30Hz, 33ms)
     setInterval(() => {
+        // Solo emite si hay cambios, evita emitir a todos siempre
         nsp.emit('gameState', gameState);
     }, 1000 / 30); // 30Hz, emite cada 33ms
 };
