@@ -125,7 +125,7 @@ export const createNamespace = (namespace) => {
     // Emisión periódica (aunque no siempre es necesario si se emiten cambios en tiempo real)
     setInterval(() => {
         nsp.emit('gameState', gameState);
-    }, 100); // Esto emite el estado global a todos cada 100 ms
+    }, 200); // Esto emite el estado global a todos cada 100 ms
 
     namespaces[namespace] = nsp;
 };
