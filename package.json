@@ -6,7 +6,8 @@
   "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node --experimental-modules server.js"
+    "start": "node --experimental-modules server.js",
+    "postinstall": "npm install --omit=dev"
   },
   "keywords": [],
   "author": "",
