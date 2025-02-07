@@ -85,25 +85,36 @@ const namespaces = {};
 
 export const createNamespace = (namespace) => {
     const nsp = io.of(namespace);
-    const players = {};
+
+    // Estado global del juego para este namespace
+    const gameState = {
+        estrellas: generarEstrellas(), // Genera las posiciones de las estrellas al crear el namespace
+        players: {}
+    };
 
     nsp.on('connection', (socket) => {
         console.log(`Nuevo jugador conectado en ${namespace}:`, socket.id);
 
-        players[socket.id] = { x: Math.random() * 800, y: Math.random() * 600, id: socket.id };
+        // Asignar posición inicial aleatoria al nuevo jugador
+        gameState.players[socket.id] = {
+            x: Math.random() * 800,
+            y: Math.random() * 600,
+            id: socket.id
+        };
 
-        // Enviar la lista actual de jugadores al nuevo jugador
-        socket.emit('currentPlayers', players);
+        // Enviar el estado global actual al nuevo jugador
+        socket.emit('gameState', gameState);
 
         // Notificar a todos los demás jugadores sobre el nuevo jugador
-        socket.broadcast.emit('newPlayer', players[socket.id]);
+        socket.broadcast.emit('newPlayer', gameState.players[socket.id]);
 
         socket.on('move', (data) => {
-            if (players[socket.id]) {
-                players[socket.id].x = data.x;
-                players[socket.id].y = data.y;
-                // Notificar a todos los demás jugadores sobre el movimiento del jugador
-                socket.broadcast.emit('playerMoved', players[socket.id]);
+            if (gameState.players[socket.id]) {
+                gameState.players[socket.id].x = data.x;
+                gameState.players[socket.id].y = data.y;
+
+                // Emitir el estado actualizado a todos los clientes
+                nsp.emit('gameState', gameState);
             }
         });
 
@@ -114,14 +125,31 @@ export const createNamespace = (namespace) => {
 
         socket.on('disconnect', () => {
             console.log(`Jugador desconectado en ${namespace}:`, socket.id);
-            // Notificar a todos los demás jugadores sobre la desconexión del jugador
+
+            // Notificar a los demás jugadores y eliminar al jugador
             socket.broadcast.emit('playerDisconnected', socket.id);
-            delete players[socket.id];
+            delete gameState.players[socket.id];
+
+            // Enviar estado actualizado
+            nsp.emit('gameState', gameState);
         });
     });
 
     namespaces[namespace] = nsp;
 };
+
+// Función para generar estrellas en posiciones aleatorias
+function generarEstrellas() {
+    const estrellas = [];
+    for (let i = 0; i < 10; i++) {
+        estrellas.push({
+            x: Math.random() * 800,
+            y: Math.random() * 600
+        });
+    }
+    return estrellas;
+}
+
 
 // Aumentar los valores de keepAliveTimeout y headersTimeout
 server.keepAliveTimeout = 120 * 1000; // 120 segundos
