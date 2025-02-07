@@ -69,20 +69,13 @@ app.use('/socket.io', express.static(path.join(__dirname, 'node_modules', 'socke
 app.use('/auth', authRoutes(pool));
 app.use('/servers', serverRoutes(pool));
 
-// Ruta protegida (ejemplo)
-app.get('/protected', (req, res) => {
-    const isAuthenticated = false; // Cambia esto por tu lógica de autenticación
-    if (isAuthenticated) {
-        res.status(200).send('Contenido protegido');
-    } else {
-        res.redirect('http://stars-hunters.ctorres.cat/login.html'); // Redirigir al frontend para el login
-    }
-});
-
 // Crear múltiples namespaces para diferentes instancias de juego
 const namespaces = {};
 
 export const createNamespace = (namespace) => {
+    // Evitar crear el namespace si ya existe
+    if (namespaces[namespace]) return;
+
     const nsp = io.of(namespace);
 
     // Estado global del juego para este namespace
@@ -93,42 +86,42 @@ export const createNamespace = (namespace) => {
 
     nsp.on('connection', (socket) => {
         console.log(`Nuevo jugador conectado en ${namespace}: ${socket.id}`);
-    
+
         // Asignar posición inicial aleatoria al nuevo jugador
         gameState.players[socket.id] = {
             x: Math.random() * 800,
             y: Math.random() * 600,
             id: socket.id
         };
-    
+
         // Enviar el estado global actual al nuevo jugador
         socket.emit('gameState', gameState);
-    
+
         // Notificar a todos los demás jugadores sobre el nuevo jugador
         socket.broadcast.emit('newPlayer', gameState.players[socket.id]);
-    
+
         socket.on('move', (data) => {
             if (gameState.players[socket.id]) {
                 gameState.players[socket.id].x = data.x;
                 gameState.players[socket.id].y = data.y;
-    
+
                 // Emitir el estado actualizado a todos los clientes
                 nsp.emit('gameState', gameState);
             }
         });
-    
+
         socket.on('disconnect', () => {
             console.log(`Jugador desconectado en ${namespace}: ${socket.id}`);
-    
+
             // Notificar a los demás jugadores y eliminar al jugador
             socket.broadcast.emit('playerDisconnected', socket.id);
             delete gameState.players[socket.id];
-    
+
             // Enviar estado actualizado
             nsp.emit('gameState', gameState);
         });
     });
-    
+
     // Emisión periódica (aunque no siempre es necesario si se emiten cambios en tiempo real)
     setInterval(() => {
         nsp.emit('gameState', gameState);
