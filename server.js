@@ -93,51 +93,46 @@ export const createNamespace = (namespace) => {
 
     nsp.on('connection', (socket) => {
         console.log(`Nuevo jugador conectado en ${namespace}: ${socket.id}`);
-
+    
         // Asignar posición inicial aleatoria al nuevo jugador
         gameState.players[socket.id] = {
             x: Math.random() * 800,
             y: Math.random() * 600,
             id: socket.id
         };
-
+    
         // Enviar el estado global actual al nuevo jugador
         socket.emit('gameState', gameState);
-
-        // Notificar a todos los jugadores sobre el nuevo jugador
-        nsp.emit('newPlayer', gameState.players[socket.id]);
-
+    
+        // Notificar a todos los demás jugadores sobre el nuevo jugador
+        socket.broadcast.emit('newPlayer', gameState.players[socket.id]);
+    
         socket.on('move', (data) => {
             if (gameState.players[socket.id]) {
                 gameState.players[socket.id].x = data.x;
                 gameState.players[socket.id].y = data.y;
-
+    
                 // Emitir el estado actualizado a todos los clientes
                 nsp.emit('gameState', gameState);
             }
         });
-
-        socket.on('estrella', (data) => {
-            console.log(`Mensaje recibido: ${data}`);
-            socket.emit('respuesta', 'Mensaje recibido en el servidor');
-        });
-
+    
         socket.on('disconnect', () => {
             console.log(`Jugador desconectado en ${namespace}: ${socket.id}`);
-
+    
             // Notificar a los demás jugadores y eliminar al jugador
-            nsp.emit('playerDisconnected', socket.id);
+            socket.broadcast.emit('playerDisconnected', socket.id);
             delete gameState.players[socket.id];
-
+    
             // Enviar estado actualizado
             nsp.emit('gameState', gameState);
         });
     });
-
-    // Enviar actualizaciones constantes a los clientes
+    
+    // Emisión periódica (aunque no siempre es necesario si se emiten cambios en tiempo real)
     setInterval(() => {
         nsp.emit('gameState', gameState);
-    }, 100);
+    }, 100); // Esto emite el estado global a todos cada 100 ms
 
     namespaces[namespace] = nsp;
 };
