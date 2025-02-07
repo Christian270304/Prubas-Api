@@ -82,12 +82,15 @@ export const createNamespace = (namespace) => {
     nsp.on('connection', (socket) => {
         console.log(`Nuevo jugador conectado en ${namespace}: ${socket.id}`);
 
-        // Asignar posición inicial aleatoria al nuevo jugador
-        gameState.players[socket.id] = {
-            x: Math.random() * 800,
-            y: Math.random() * 600,
-            id: socket.id
-        };
+        // Si el jugador ya existe en el estado, mantenemos su posición
+        if (!gameState.players[socket.id]) {
+            // Asignar posición inicial aleatoria al nuevo jugador
+            gameState.players[socket.id] = {
+                x: Math.random() * 800,
+                y: Math.random() * 600,
+                id: socket.id
+            };
+        }
 
         // Emitir estado inicial al jugador
         socket.emit('gameState', gameState);
@@ -114,16 +117,28 @@ export const createNamespace = (namespace) => {
             console.log(`Jugador desconectado en ${namespace}: ${socket.id}`);
             socket.broadcast.emit('playerDisconnected', socket.id);
             delete gameState.players[socket.id];
-            nsp.emit('gameState', gameState);
         });
     });
 
     namespaces[namespace] = nsp;
 
-     // Emisión periódica del estado del juego a todos los jugadores (30Hz, 33ms)
-     setInterval(() => {
+    // Emisión periódica del estado del juego a todos los jugadores (30Hz, 33ms)
+    setInterval(() => {
         nsp.emit('gameState', gameState);
     }, 1000 / 30); // 30Hz, emite cada 33ms
+
+    // **Emisión de movimiento solo a jugadores cercanos (20Hz, 50ms)**
+    setInterval(() => {
+        // Emitir solo jugadores que han cambiado
+        Object.values(gameState.players).forEach(player => {
+            // Enviar solo los jugadores cercanos (por ejemplo, a 500px de distancia)
+            Object.values(gameState.players).forEach(otherPlayer => {
+                if (Math.abs(player.x - otherPlayer.x) < 500 && Math.abs(player.y - otherPlayer.y) < 500) {
+                    nsp.to(otherPlayer.id).emit('playerMoved', player); // Emite solo a los jugadores cercanos
+                }
+            });
+        });
+    }, 1000 / 20); // 20Hz (50ms) - menos frecuente que la actualización del estado completo
 };
 
 // Función para generar estrellas en posiciones aleatorias
