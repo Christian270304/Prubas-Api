@@ -8,7 +8,9 @@ import mysql from 'mysql2/promise';
 import authRoutes from './routes/auth.js';
 import serverRoutes from './routes/servers.js';
 
+// Usar el puerto proporcionado por Render o el puerto 3000 en desarrollo
 const PORT = process.env.PORT || 3000;
+
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
@@ -17,14 +19,15 @@ const io = new Server(server, {
         methods: ['GET', 'POST'],
         allowedHeaders: ['Content-Type'],
         credentials: true
-    },
-    perMessageDeflate: true // Habilitar compresión de mensajes
+    }
 });
 
-let pool;
-let namespaces = {};
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// Conectar a la base de datos
+let pool;
+
+// Conectar a la base de datos MySQL
 async function connectToDatabase() {
     try {
         pool = mysql.createPool({
@@ -33,19 +36,42 @@ async function connectToDatabase() {
             password: process.env.PASSWORD,
             database: process.env.DATABASE,
             waitForConnections: true,
-            connectionLimit: 10,
+            connectionLimit: 10, // Ajusta este valor según tus necesidades
             queueLimit: 0
         });
+
         console.log('Conectado a la base de datos');
     } catch (error) {
         console.error('Error al conectar a la base de datos:', error);
-        process.exit(1);
+        process.exit(1); // Salir del proceso si no se puede conectar a la base de datos
     }
 }
 
 await connectToDatabase();
 
-// Crear el namespace en Socket.IO
+// Middleware para parsear JSON
+app.use(express.json());
+
+// Configurar CORS para permitir solicitudes desde el dominio del frontend
+app.use(cors({
+    origin: 'http://stars-hunters.ctorres.cat',
+    methods: ['GET', 'POST'],
+    allowedHeaders: ['Content-Type'],
+    credentials: true
+}));
+
+app.options('*', cors());
+
+// Servir el archivo socket.io.js desde node_modules
+app.use('/socket.io', express.static(path.join(__dirname, 'node_modules', 'socket.io', 'client-dist')));
+
+// Usar las rutas de autenticación
+app.use('/auth', authRoutes(pool));
+app.use('/servers', serverRoutes(pool));
+
+// Crear múltiples namespaces para diferentes instancias de juego
+const namespaces = {};
+
 export const createNamespace = (namespace) => {
     const nsp = io.of(namespace);
     const gameState = {
@@ -95,7 +121,7 @@ export const createNamespace = (namespace) => {
     namespaces[namespace] = nsp;
 };
 
-// Generar estrellas aleatorias
+// Función para generar estrellas en posiciones aleatorias
 function generarEstrellas() {
     return Array.from({ length: 10 }, () => ({
         x: Math.random() * 800,
@@ -103,10 +129,11 @@ function generarEstrellas() {
     }));
 }
 
-// Configuración para mantener la conexión activa
+// Aumentar los valores de keepAliveTimeout y headersTimeout
 server.keepAliveTimeout = 120 * 1000; // 120 segundos
 server.headersTimeout = 120 * 1000; // 120 segundos
 
+// Iniciar el servidor
 server.listen(PORT, () => {
-    console.log(`Servidor escuchando en el puerto ${PORT}`);
+    console.log(`🚀 Servidor escuchando en el puerto ${PORT}`);
 });
