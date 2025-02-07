@@ -1,18 +1,31 @@
 import express from 'express';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import mysql from 'mysql2/promise';
 import authRoutes from './routes/auth.js';
 import serverRoutes from './routes/servers.js';
+import { Worker } from 'worker_threads';
+
 
 // Usar el puerto proporcionado por Render o el puerto 3000 en desarrollo
 const PORT = process.env.PORT || 3000;
 
 const app = express();
 const server = createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+    cors: {
+        origin: 'http://stars-hunters.ctorres.cat',
+        methods: ['GET', 'POST'],
+        allowedHeaders: ['Content-Type'],
+        credentials: true
+    }
+});
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 let pool;
 
@@ -43,66 +56,116 @@ app.use(express.json());
 
 // Configurar CORS para permitir solicitudes desde el dominio del frontend
 app.use(cors({
-    origin: 'http://stars-hunters.ctorres.cat', 
+    origin: 'http://stars-hunters.ctorres.cat',
     methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type']
+    allowedHeaders: ['Content-Type'],
+    credentials: true
 }));
 
 app.options('*', cors());
+
+// Servir el archivo socket.io.js desde node_modules
+app.use('/socket.io', express.static(path.join(__dirname, 'node_modules', 'socket.io', 'client-dist')));
 
 // Usar las rutas de autenticación
 app.use('/auth', authRoutes(pool));
 app.use('/servers', serverRoutes(pool));
 
-// Ruta protegida (ejemplo)
-app.get('/protected', (req, res) => {
-    // Aquí deberías verificar si el usuario está autenticado
-    const isAuthenticated = false; // Cambia esto por tu lógica de autenticación
-    if (isAuthenticated) {
-        res.status(200).send('Contenido protegido');
-    } else {
-        res.redirect('http://stars-hunters.ctorres.cat/login.html'); // Redirigir al frontend para el login
-    }
-});
-
 // Crear múltiples namespaces para diferentes instancias de juego
 const namespaces = {};
+const gameStates = {}; // Guardará el estado de cada namespace
 
-const createNamespace = (namespace) => {
+export const createNamespace = (namespace) => {
     const nsp = io.of(namespace);
-    const players = {};
+    
+    const gameState = {
+        estrellas: generarEstrellas(),
+        players: {}
+    };
+
+    gameStates[namespace] = gameState; // Guardar el estado globalmente
 
     nsp.on('connection', (socket) => {
-        console.log(`Nuevo jugador conectado en ${namespace}:`, socket.id);
+        console.log(`Nuevo jugador conectado en ${namespace}: ${socket.id}`);
 
-        players[socket.id] = { x: Math.random() * 800, y: Math.random() * 600, id: socket.id };
+        if (!gameState.players[socket.id]) {
+            gameState.players[socket.id] = {
+                x: Math.random() * 800,
+                y: Math.random() * 600,
+                id: socket.id
+            };
+        }
 
-        socket.emit('currentPlayers', players);
-        socket.broadcast.emit('newPlayer', players[socket.id]);
+        socket.emit('gameState', gameState);
+        socket.broadcast.emit('newPlayer', gameState.players[socket.id]);
 
         socket.on('move', (data) => {
-            if (players[socket.id]) {
-                players[socket.id].x = data.x;
-                players[socket.id].y = data.y;
-                socket.broadcast.emit('playerMoved', players[socket.id]);
+            if (gameState.players[socket.id]) {
+                gameState.players[socket.id].x = data.x;
+                gameState.players[socket.id].y = data.y;
+
+                Object.values(gameState.players).forEach(p => {
+                    if (Math.abs(gameState.players[socket.id].x - p.x) < 500 &&
+                        Math.abs(gameState.players[socket.id].y - p.y) < 500) {
+                        socket.to(p.id).emit('playerMoved', gameState.players[socket.id]);
+                    }
+                });
             }
         });
 
-        socket.on('estrella', (data) => {
-            console.log(`Mensaje recibido: ${data}`);
-            socket.emit('respuesta', 'Mensaje recibido en el servidor');
-        });
-
         socket.on('disconnect', () => {
-            console.log(`Jugador desconectado en ${namespace}:`, socket.id);
-            delete players[socket.id];
+            console.log(`Jugador desconectado en ${namespace}: ${socket.id}`);
+            socket.broadcast.emit('playerDisconnected', socket.id);
+            delete gameState.players[socket.id];
         });
     });
 
     namespaces[namespace] = nsp;
 };
 
+// Función para generar estrellas en posiciones aleatorias
+function generarEstrellas() {
+    return Array.from({ length: 10 }, () => ({
+        x: Math.random() * 800,
+        y: Math.random() * 600
+    }));
+}
+
+// Función para actualizar el estado del juego usando un Worker
+function updateGameStateWithWorker(gameState) {
+    return new Promise((resolve, reject) => {
+        const worker = new Worker('./gameWorker.js');
+        
+        worker.on('message', (updatedGameState) => {
+            resolve(updatedGameState);
+        });
+        
+        worker.on('error', (error) => {
+            reject(error);
+        });
+
+        // Enviar el estado del juego al worker
+        worker.postMessage(gameState);
+    });
+}
+
+// Usar Worker para actualizar el estado del juego en intervalos
+setInterval(() => {
+    Object.keys(gameStates).forEach(namespace => {
+        updateGameStateWithWorker(namespace)
+            .then(updatedGameState => {
+                gameStates[namespace] = updatedGameState;
+                io.of(namespace).emit('gameState', updatedGameState);
+            })
+            .catch(error => console.error(`Error en worker (${namespace}):`, error));
+    });
+}, 1000 / 20); // 20Hz (50ms)
+
+// Aumentar los valores de keepAliveTimeout y headersTimeout
+server.keepAliveTimeout = 120 * 1000; // 120 segundos
+server.headersTimeout = 120 * 1000; // 120 segundos
+
 // Iniciar el servidor
 server.listen(PORT, () => {
-    console.log(`Servidor escuchando en el puerto ${PORT}`);
+    console.log(`🚀 Servidor escuchando en el puerto ${PORT}`);
 });
