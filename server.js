@@ -92,11 +92,18 @@ export const createNamespace = (namespace) => {
             id: socket.id
         });
 
-        // Emitir estado inicial al jugador
+        // Emitir estado inicial al jugador (incluyendo jugadores y estrellas)
         socket.emit('gameState', gameState);
 
         // Notificar a otros jugadores sobre el nuevo jugador
         socket.broadcast.emit('newPlayer', gameState.players.get(socket.id));
+
+        // Emitir la lista completa de jugadores a los demás
+        gameState.players.forEach((player, id) => {
+            if (id !== socket.id) {
+                socket.emit('newPlayer', player);
+            }
+        });
 
         // Manejo de movimiento
         socket.on('move', (data) => {
@@ -119,7 +126,7 @@ export const createNamespace = (namespace) => {
             console.log(`Jugador desconectado en ${namespace}: ${socket.id}`);
             socket.broadcast.emit('playerDisconnected', socket.id);
             gameState.players.delete(socket.id);
-            nsp.emit('gameState', gameState);
+            nsp.emit('gameState', gameState); // Actualizar a todos los jugadores
         });
     });
 
