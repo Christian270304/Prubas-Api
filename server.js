@@ -97,7 +97,7 @@ export const createNamespace = (namespace) => {
             estrellas: gameState.estrellas,
             players: Object.fromEntries(gameState.players) // Convertimos el Map a un objeto
         });
-    
+        console.log("Estado de los jugadores enviado:", Object.fromEntries(gameState.players));
         // Notificar a otros jugadores sobre el nuevo jugador
         socket.broadcast.emit('newPlayer', gameState.players.get(socket.id));
     
