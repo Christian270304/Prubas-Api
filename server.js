@@ -83,53 +83,49 @@ export const createNamespace = (namespace) => {
     gameStates[namespace] = gameState; // Guardar el estado globalmente
 
     nsp.on('connection', (socket) => {
-        console.log(`Nuevo jugador conectado en ${namespace}: ${socket.id}`);
-
-        // Asignar posición inicial aleatoria al nuevo jugador
+        console.log(`Nuevo jugador conectado: ${socket.id}`);
+    
+        // Asignar una posición inicial aleatoria al jugador
         gameState.players.set(socket.id, {
             x: Math.random() * 800,
             y: Math.random() * 600,
             id: socket.id
         });
-        console.log('Estado actual de jugadores:', gameState.players); 
-        // Emitir estado inicial al jugador (incluyendo jugadores y estrellas)
+    
+        // Emitir el estado inicial al nuevo jugador
         socket.emit('gameState', {
             estrellas: gameState.estrellas,
             players: Object.fromEntries(gameState.players) // Convertimos el Map a un objeto
         });
-
+    
         // Notificar a otros jugadores sobre el nuevo jugador
         socket.broadcast.emit('newPlayer', gameState.players.get(socket.id));
-
-        // Emitir la lista completa de jugadores a los demás
-        gameState.players.forEach((player, id) => {
-            if (id !== socket.id) {
-                socket.emit('newPlayer', player);
-            }
-        });
-
-        // Manejo de movimiento
+    
+        // Manejo de movimiento del jugador
         socket.on('move', (data) => {
-            if (gameState.players.has(socket.id)) {
-                const player = gameState.players.get(socket.id);
+            // Asegurarse de que el jugador está en el Map
+            const player = gameState.players.get(socket.id);
+            if (player) {
                 player.x = data.x;
                 player.y = data.y;
-
-                // Emitir solo a jugadores cercanos
-                gameState.players.forEach((p, id) => {
-                    if (Math.abs(player.x - p.x) < 500 && Math.abs(player.y - p.y) < 500) {
-                        socket.to(id).emit('playerMoved', player);
-                    }
+                // Emitir el estado actualizado a todos los jugadores
+                nsp.emit('gameState', {
+                    estrellas: gameState.estrellas,
+                    players: Object.fromEntries(gameState.players) // Convertimos el Map a un objeto
                 });
             }
         });
-
-        // Manejo de desconexión
+    
+        // Manejo de desconexión de jugador
         socket.on('disconnect', () => {
-            console.log(`Jugador desconectado en ${namespace}: ${socket.id}`);
-            socket.broadcast.emit('playerDisconnected', socket.id);
+            console.log(`Jugador desconectado: ${socket.id}`);
+            // Eliminar el jugador del Map
             gameState.players.delete(socket.id);
-            nsp.emit('gameState', gameState); // Actualizar a todos los jugadores
+            // Emitir el estado actualizado a todos los jugadores
+            nsp.emit('gameState', {
+                estrellas: gameState.estrellas,
+                players: Object.fromEntries(gameState.players) // Convertimos el Map a un objeto
+            });
         });
     });
 
