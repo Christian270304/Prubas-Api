@@ -91,7 +91,7 @@ export const createNamespace = (namespace) => {
             y: Math.random() * 600,
             id: socket.id
         });
-
+        console.log('Estado actual de jugadores:', gameState.players); 
         // Emitir estado inicial al jugador (incluyendo jugadores y estrellas)
         socket.emit('gameState', gameState);
 
