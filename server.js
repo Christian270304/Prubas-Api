@@ -96,7 +96,7 @@ export const createNamespace = (namespace) => {
         socket.emit('gameState', gameState);
 
         // Notificar a otros jugadores sobre el nuevo jugador
-        socket.broadcast.emit('newPlayer', gameState.players.get(socket.id));
+        socket.broadcast.emit('newPlayer', gameState.players(socket.id));
 
         // Emitir la lista completa de jugadores a los demás
         gameState.players.forEach((player, id) => {
