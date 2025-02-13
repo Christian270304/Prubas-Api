@@ -74,6 +74,7 @@ app.use('/socket.io', express.static(path.join(__dirname, 'node_modules', 'socke
 app.use('/auth', authRoutes(pool));
 app.use('/servers', serverRoutes(pool));
 
+
 // Crear múltiples namespaces para diferentes instancias de juego
 const namespaces = {};
 const gameStates = {}; // Guardará el estado de cada namespace
